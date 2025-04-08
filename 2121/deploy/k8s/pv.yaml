@@ -22,4 +22,4 @@ spec:
     required:
       nodeSelectorTerms:
         - matchExpressions:
-            - {key: kubernetes.io/hostname, operator: In, values: [agentpool]}
+            - {key: kubernetes.azure.com/agentpool, operator: In, values: [k8smaster]}
