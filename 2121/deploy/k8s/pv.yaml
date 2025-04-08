@@ -18,8 +18,8 @@ spec:
   local:
     path: "/root/k8s-local-volume/2121"
   storageClassName: azurefile
-  nodeAffinity:
-    required:
-      nodeSelectorTerms:
-        - matchExpressions:
-            - {key: kubernetes.azure.com/agentpool, operator: In, values: [k8smaster]}
+  #nodeAffinity:
+  #  required:
+  #    nodeSelectorTerms:
+  #      - matchExpressions:
+  #          - {key: kubernetes.azure.com/agentpool, operator: In, values: [k8smaster]}
