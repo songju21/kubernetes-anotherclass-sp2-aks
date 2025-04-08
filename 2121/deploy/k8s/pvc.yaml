@@ -16,6 +16,7 @@ spec:
       storage: 2G
   accessModes:
     - ReadWriteOnce
+  storageClassName: azurefile
   selector:
     matchLabels:
       part-of: k8s-anotherclass
