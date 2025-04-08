@@ -11,18 +11,14 @@
 #    version: 1.0.0
 #    managed-by: kubectl
 #spec:
+#  accessModes:
+#    - ReadWriteMany
+#  volumeName: pvc-3945ee73-532c-4e2b-bdda-97f019a156dc
+#  storageClassName: azurefile
+#  volumeMode: Filesystem
 #  resources:
 #    requests:
-#      storage: 2G
-#  accessModes:
-#    - ReadWriteOnce
-#  storageClassName: azurefile
-#  selector:
-#    matchLabels:
-#      part-of: k8s-anotherclass
-#      component: backend-server
-#      name: api-tester
-#      instance: api-tester-2121-files
+#      storage: 2Gi
 
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -39,9 +35,8 @@ metadata:
 spec:
   accessModes:
     - ReadWriteMany
-  volumeName: pvc-3945ee73-532c-4e2b-bdda-97f019a156dc
-  storageClassName: azurefile
-  volumeMode: Filesystem
+  storageClassName: azurefile-csi
+  volumeName: api-tester-2121-files
   resources:
     requests:
-      storage: 2Gi
+      storage: 5Gi
