@@ -30,7 +30,8 @@ spec:
         version: 1.0.0
     spec:
       nodeSelector:
-        kubernetes.io/hostname: agentpool
+        #kubernetes.io/hostname: agentpool
+        kubernetes.azure.com/agentpool: k8smaster
       containers:
         - name: api-tester-2121
           image: songju021/api-tester:v1.0.0
