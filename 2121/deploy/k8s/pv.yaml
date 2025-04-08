@@ -9,17 +9,29 @@ metadata:
     instance: api-tester-2121-files
     version: 1.0.0
     managed-by: kubectl
+  annotations:
+    pv.kubernetes.io/provisioned-by: file.csi.azure.com
 spec:
   capacity:
-    storage: 2G
-  volumeMode: Filesystem
+    storage: 5Gi
   accessModes:
-    - ReadWriteOnce
-  local:
-    path: "/root/k8s-local-volume/2121"
-  storageClassName: azurefile
-  #nodeAffinity:
-  #  required:
-  #    nodeSelectorTerms:
-  #      - matchExpressions:
-  #          - {key: kubernetes.azure.com/agentpool, operator: In, values: [k8smaster]}
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: azurefile-csi
+  csi:
+    driver: file.csi.azure.com
+    volumeHandle: "MC_rg-songju-aks_aks-songju-test_koreacentral#f90ce74d4b7df48d1b957d1#sharesongjutest"  # make sure this volumeid is unique for every identical share in the cluster
+    volumeAttributes:
+      shareName: aksshare
+    nodeStageSecretRef:
+      name: azure-secret
+      namespace: default
+  mountOptions:
+    - dir_mode=0777
+    - file_mode=0777
+    - uid=0
+    - gid=0
+    - mfsymlinks
+    - cache=strict
+    - nosharesock
+    - nobrl  # disable sending byte range lock requests to the server and for applications which have challenges with posix locks
