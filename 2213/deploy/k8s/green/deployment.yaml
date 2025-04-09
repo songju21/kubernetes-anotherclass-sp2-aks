@@ -31,7 +31,7 @@ spec:
         kubernetes.azure.com/agentpool: k8smaster
       containers:
         - name: api-tester-2
-          image: 1pro/api-tester:v2.0.0
+          image: songju021/api-tester:v2.0.0
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
