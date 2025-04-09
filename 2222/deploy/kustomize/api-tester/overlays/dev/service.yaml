@@ -3,9 +3,10 @@ kind: Service
 metadata:
   name: api-tester-2222
 spec:
+  type: LoadBalancer
   ports:
     - name: http
       port: 80
       targetPort: http
       nodePort: 32222
-  type: LoadBalancer
+
