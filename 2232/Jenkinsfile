@@ -14,7 +14,7 @@ pipeline {
     environment {
         // 본인의 username으로 하실 분은 수정해주세요.
         DOCKERHUB_USERNAME = 'songju021'
-        GITHUB_URL = 'https://github.com/songju21/kubernetes-anotherclass-sprint2.git'
+        GITHUB_URL = 'https://github.com/songju21/kubernetes-anotherclass-sp2-aks.git'
 
         APP_VERSION = '1.1.1'
         BUILD_DATE = sh(script: "echo `date +%y%m%d.%d%H%M`", returnStdout: true).trim()
