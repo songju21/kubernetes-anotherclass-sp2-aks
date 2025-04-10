@@ -21,3 +21,4 @@ spec:
       component: backend-server
       name: api-tester
       instance: api-tester-2231-files
+  storageClassName: songju-azurefile
