@@ -15,10 +15,10 @@ spec:
       storage: 2G
   accessModes:
     - ReadWriteOnce
-  selector:
-    matchLabels:
-      part-of: k8s-anotherclass
-      component: backend-server
-      name: api-tester
-      instance: api-tester-2231-files
+  #selector:
+  #  matchLabels:
+  #    part-of: k8s-anotherclass
+  #    component: backend-server
+  #    name: api-tester
+  #    instance: api-tester-2231-files
   storageClassName: songju-azurefile
