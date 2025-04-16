@@ -1,0 +1,381 @@
+OS :  Rocky Linux release 8.10
+agentpool명 : k8smaster
+사용 github : https://github.com/songju21/kubernetes-anotherclass-sp2-aks.git
+사용 docker Repository : songju021/api-tester
+=============================================================================================================
+### CICD 서버 세팅 명령어 ###
+1. 설치
+	sudo su
+    yum -y update
+	sudo rm -f /var/lib/rpm/__db*
+	sudo rpm --rebuilddb	
+	rpm --import https://packages.microsoft.com/keys/microsoft.asc
+		# 오류시 하위 명령어 실행 후 재시도
+		sudo rm -f /var/lib/rpm/__db*
+		sudo rpm --rebuilddb
+	yum install -y https://packages.microsoft.com/config/rhel/8/packages-microsoft-prod.rpm
+	yum install azure-cli
+    timedatectl set-timezone Asia/Seoul
+    timedatectl set-ntp true
+    chronyc makestep
+	systemctl stop firewalld && systemctl disable firewalld
+	
+	swapoff -a && sed -i '/ swap / s/^/#/' /etc/fstab
+	az aks install-cli
+	yum -y install git
+	
+	az login
+   
+    yum install -y yum-utils
+    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+    yum install -y docker-ce-3:23.0.6-1.el8 docker-ce-cli-1:23.0.6-1.el8 containerd.io-1.6.21-3.1.el8
+    systemctl daemon-reload
+    systemctl enable --now docker
+   
+    yum install -y java-17-openjdk
+    yum -y install wget unzip
+    wget https://services.gradle.org/distributions/gradle-7.6.1-bin.zip -P ~/
+    unzip -d /opt/gradle ~/gradle-*.zip
+    cat <<EOF |tee /etc/profile.d/gradle.sh
+export GRADLE_HOME=/opt/gradle/gradle-7.6.1
+export PATH=/opt/gradle/gradle-7.6.1/bin:${PATH}
+EOF
+    chmod +x /etc/profile.d/gradle.sh
+    source /etc/profile.d/gradle.sh
+  
+    wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
+    rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+    yum install -y jenkins-2.440.2-1.1
+    systemctl enable jenkins
+    systemctl start jenkins
+    cat /var/lib/jenkins/secrets/initialAdminPassword
+
+2. 세팅
+	# jenkins 설정
+	NSG에서 8080 inbound open 
+	접속 : http://<CICD서버IP>:8080/login
+		[root@cicd-server ~]#cat /var/lib/jenkins/secrets/initialAdminPassword 결과 값 입력. = > install 플러그인
+		계정 설정 
+	
+	# JDK, Gradle 값 jenkins에 등록.
+	 => cicd 서버에서 " find / -name java | grep java-17-openjdk " /bin/java 제외하고 복사
+		name : jdk-17  /  JAVA_HOME : 위에꺼.
+		Name : gradle-7.6.1		/ GRADLE_HOME : /opt/gradle/gradle-7.6.1
+	
+	# jeknins가 Docker를 사용할 수 있도록 권한 부여
+		[root@cicd-server ~]# chmod 666 /var/run/docker.sock
+		[root@cicd-server ~]# usermod -aG docker jenkins
+
+	# Jeknins로 사용자 변경 
+		[root@cicd-server ~]# su - jenkins -s /bin/bash
+
+	# 자신의 Dockerhub로 로그인 하기
+		[jenkins@cicd-server ~]$ docker login
+	
+	# AKS 인증서 복사
+		[jenkins@cicd-server ~]$ mkdir ~/.kube
+		[jenkins@cicd-server ~]$ cp /root/.kube/config /var/lib/jenkins/.kube/
+		[jenkins@cicd-server ~]$ chown jenkins:jenkins /var/lib/jenkins/.kube/config
+		[jenkins@cicd-server ~]$ kubectl get pods -A
+		kubectl 명령어 오류시 PATH 추가 [jenkins@cicd-server ~]$ PATH=$PATH:/usr/local/bin
+		
+
+=============================================================================================================
+  
+### helm 설치 및 확인
+	[root@cicd-server ~]# curl -O https://get.helm.sh/helm-v3.13.2-linux-amd64.tar.gz
+	[root@cicd-server ~]# tar -zxvf helm-v3.13.2-linux-amd64.tar.gz
+	[root@cicd-server ~]# mv linux-amd64/helm /usr/bin/helm
+	
+	[root@cicd-server ~]# su - jenkins -s /bin/bash
+	[jenkins@cicd-server ~]$ helm
+	
+	[jenkins@cicd-server ~]$ helm create api-tester
+
+=============================================================================================================
+
+### Kustomize 확인
+	kubectl version --client
+
+	kubectl patch -n anotherclass-222 svc api-tester-2221 -p '{"spec": {"type": "LoadBalancer"}}'
+
+	
+	
+=============================================================================================================
+
+	
+### argocd 설치
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl get all -n argocd
+kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
+
+#argocd-image-updater 설치
+kubectl apply -n argocd -f  https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/stable/manifests/install.yaml
+
+#argo-rollouts 설치
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-rollouts/master/manifests/install.yaml
+
+#argocd PW 확인
+kubectl get -n argocd secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+
+#argo rollouts  cli 설치
+curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+chmod +x ./kubectl-argo-rollouts-linux-amd64
+mv ./kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+
+kubectl argo rollouts version
+
+#argocd-rollouts 및 관련 권한부여는 아래 명령으로 argo-rollouts 로그 확인 후 권한부여 필요! 
+kubectl logs -n argocd -l app.kubernetes.io/name=argo-rollouts
+
+#하단에 있는 ClusterRole.yaml, ClusterRoleBinding.yaml  생성 후 rbac관련 yaml apply 실행
+kubectl apply -f ClusterRole.yaml
+kubectl apply -f ClusterRoleBinding.yaml
+
+#argo-rollouts pod 삭제 후 재배포 대기 후 log 확인시 문제 없음 확인
+kubectl delete pod -l app.kubernetes.io/name=argo-rollouts -n argocd
+kubectl logs -n argocd -l app.kubernetes.io/name=argo-rollouts
+
+
+vi ClusterRole.yaml
+########################################################################################################################
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-rollouts
+  labels:
+    app.kubernetes.io/component: rollouts-controller
+    app.kubernetes.io/name: argo-rollouts
+    app.kubernetes.io/instance: argo-rollouts
+    #app.kubernetes.io/managed-by: Helm
+    #app.kubernetes.io/version: vX.Y.Z # Helm 차트 버전에 따라 다름
+rules:
+  # Rollout 리소스 관련 권한
+  - apiGroups: ["argoproj.io"]
+    resources: ["rollouts", "rollouts/status", "rollouts/finalizers"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+
+  - apiGroups: ["argoproj.io"]
+    resources: ["analysisruns", "analysisruns/finalizers", "experiments", "experiments/finalizers"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+
+  - apiGroups: ["argoproj.io"]
+    resources: ["analysistemplates", "clusteranalysistemplates"]
+    verbs: ["get", "list", "watch"]
+
+  # ReplicaSet 관리
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+
+  # Deployment 및 PodTemplate 조회
+  - apiGroups: ["", "apps"]
+    resources: ["deployments", "podtemplates"]
+    verbs: ["get", "list", "watch"]
+
+  # 서비스 수정 및 생성
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "patch", "create", "delete"]
+
+  # 리더 선출용 lease 접근
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create", "get", "update"]
+
+  # Secret 및 ConfigMap 접근
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Pod 접근 및 업데이트
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list", "update", "watch"]
+
+  - apiGroups: [""]
+    resources: ["pods/eviction"]
+    verbs: ["create"]
+
+  # 이벤트 기록
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "update", "patch"]
+
+  # Ingress 접근 (Nginx 등)
+  - apiGroups: ["networking.k8s.io", "extensions"]
+    resources: ["ingresses"]
+    verbs: ["create", "get", "list", "watch", "update", "patch"]
+
+  # 분석 Job 접근
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+
+  # Provider RBAC들
+  # Istio
+  - apiGroups: ["networking.istio.io"]
+    resources: ["virtualservices", "destinationrules"]
+    verbs: ["watch", "get", "update", "patch", "list"]
+
+  # SMI
+  - apiGroups: ["split.smi-spec.io"]
+    resources: ["trafficsplits"]
+    verbs: ["create", "watch", "get", "update", "patch"]
+
+  # Ambassador
+  - apiGroups: ["getambassador.io", "x.getambassador.io"]
+    resources: ["mappings", "ambassadormappings"]
+    verbs: ["create", "watch", "get", "update", "list", "delete"]
+
+  # AWS Load Balancer Controller
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get"]
+  - apiGroups: ["elbv2.k8s.aws"]
+    resources: ["targetgroupbindings"]
+    verbs: ["list", "get"]
+
+  # AWS App Mesh
+  - apiGroups: ["appmesh.k8s.aws"]
+    resources: ["virtualservices"]
+    verbs: ["watch", "get", "list"]
+
+  - apiGroups: ["appmesh.k8s.aws"]
+    resources: ["virtualnodes", "virtualrouters"]
+    verbs: ["watch", "get", "list", "update", "patch"]
+
+  # Traefik
+  - apiGroups: ["traefik.containo.us"]
+    resources: ["traefikservices"]
+    verbs: ["watch", "get", "update"]
+
+  # Apisix
+  - apiGroups: ["apisix.apache.org"]
+    resources: ["apisixroutes"]
+    verbs: ["watch", "get", "update"]
+
+  # Contour
+  - apiGroups: ["projectcontour.io"]
+    resources: ["httpproxies"]
+    verbs: ["get", "list", "watch", "update"]
+
+  # Gloo Platform
+  - apiGroups: ["networking.gloo.solo.io"]
+    resources: ["routetables"]
+    verbs: ["*"]
+########################################################################################################################
+
+
+vi ClusterRoleBinding.yaml 
+########################################################################################################################
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-rollouts
+  labels:
+    app.kubernetes.io/component: rollouts-controller
+    app.kubernetes.io/name: argo-rollouts
+    app.kubernetes.io/instance: argo-rollouts
+    #app.kubernetes.io/managed-by: Helm
+    #app.kubernetes.io/version: vX.Y.Z # chart appVersion에 따라 결정됨
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-rollouts
+subjects:
+  - kind: ServiceAccount
+    name: argo-rollouts
+    namespace: "argocd" # 헬름 릴리스 namespace에 따라 다름
+########################################################################################################################
+
+
+
+
+
+@@@@@@기타참조사항@@@@@@@@@@@@@@@
+=============================================================================================================
+
+### yaml 변경사항 ###
+1. pv -> StorageClass로 변경
+
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: songju-azurefile
+provisioner: file.csi.azure.com 
+allowVolumeExpansion: true
+mountOptions:
+ - dir_mode=0777
+ - file_mode=0777
+ - uid=0
+ - gid=0
+ - mfsymlinks
+ - cache=strict
+ - actimeo=30
+ - nobrl  
+parameters:
+  skuName: Standard_LRS
+
+pvc 변경
+kind: PersistentVolumeClaim 
+spec:
+  storageClassName: songju-azurefile
+  
+=======================================================
+  
+2. Deployment 변경 hostname -> agentpool
+
+kind: Deployment
+    spec:
+      nodeSelector:
+        kubernetes.azure.com/agentpool: k8smaster
+
+=======================================================
+3. 외부에서 서비스 확인이 필요한 경우 (EXTERNAL-IP) NodePort -> LoadBalancer
+kind: Service
+spec:
+#  type: NodePort
+  type: LoadBalancer
+
+
+
+=============================================================================================================
+
+### aks 변경시! CLI 명령어 정리!!! 
+
+	az account show
+
+	az aks create --resource-group rg-songju-aks --name aks-songju --node-count 2 --generate-ssh-keys
+	az aks get-credentials --resource-group rg-songju-aks --name aks-songju --overwrite-existing
+
+	az aks nodepool add --name k8smaster --cluster-name aks-songju --resource-group rg-songju-aks --mode User --node-count 1 --node-osdisk-size 128 --node-osdisk-type Managed
+
+	kubectl get nodes
+
+	cp /root/.kube/config /var/lib/jenkins/.kube/config
+	chown jenkins:jenkins /var/lib/jenkins/.kube/config
+
+	su - jenkins -s /bin/bash
+	kubectl get pods -A
+
+	jenkins 접속
+
+
+
+=============================================================================================================
+
+
+### 상태값 확인 명령어 
+	kubectl get -n anotherclass-221 pods -l instance='api-tester-2214',blue-green-no='2' -o jsonpath='{.items[*].status.containerStatuses[*].ready}'
+
+### 설정값 변경 명령어
+	스크립트 상에서
+	kubectl patch -n anotherclass-221 svc api-tester-2214 -p '{\"spec\": {\"selector\": {\"blue-green-no\": \"2\"}}}'
+	
+	커멘드 상에서
+	kubectl patch -n anotherclass-222 svc api-tester-2221 -p '{"spec": {"type": "LoadBalancer"}}'
+
+=============================================================================================================
+
